@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # Nome exato da aba no rodapé do Google Sheets
-ABA_EXCEL = "Dados Pluviométricos Rio"
+ABA_EXCEL = "dados_rio"
 
 # Conexão com Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
