@@ -155,7 +155,7 @@ with aba_dash:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Total acumulado", f"{total_acumulado:.1f} mm")
         c2.metric("Média por evento", f"{media_evento:.1f} mm")
-        c3.metric("Maior volume", f"{maior_volume:.1f} mm")
+        c3.metric("Precipitação Máxima ", f"{maior_volume:.1f} mm")
         c4.metric("Dias com chuva", f"{quantidade_dias_chuva}")
 
         # Gráfico Temporal
