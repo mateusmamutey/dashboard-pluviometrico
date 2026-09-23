@@ -13,7 +13,8 @@ st.set_page_config(
     page_icon="🌧️",
 )
 
-ABA_EXCEL = "dados_rio"
+# Nome exato da aba no rodapé do Google Sheets
+ABA_EXCEL = "Dados Pluviométricos Rio"
 
 # Conexão com Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -38,12 +39,12 @@ def carregar_dados() -> pd.DataFrame:
     }
 
     if not colunas_obrigatorias.issubset(df.columns):
-        st.error("Colunas obrigatórias ausentes na folha de cálculo do Google Sheets.")
+        st.error("Colunas obrigatórias ausentes na planilha do Google Sheets.")
         st.stop()
 
-    # Tratamento DATA - Corrige formatos mistos ajustando dia e mês corretamente
+    # TRATAMENTO DATA: dayfirst=True garante que 05/10/2020 seja 05 de Outubro
     df["DATA"] = pd.to_datetime(
-        df["DATA"], dayfirst=False, errors="coerce", format="mixed"
+        df["DATA"], dayfirst=True, errors="coerce", format="mixed"
     )
     df = df.dropna(subset=["DATA"]).copy()
 
@@ -80,7 +81,7 @@ def carregar_dados() -> pd.DataFrame:
 
 df = carregar_dados()
 
-# NAVEGAÇÃO EM ABAS (IDEAL PARA TELEMÓVEL E PC)
+# NAVEGAÇÃO EM ABAS
 aba_dash, aba_form = st.tabs(["📊 Dashboard", "📝 Novo Lançamento"])
 
 
@@ -143,7 +144,7 @@ with aba_dash:
     df_filtrado = df.loc[mascara].copy()
 
     if df_filtrado.empty:
-        st.warning("Nenhum registo encontrado com os filtros selecionados.")
+        st.warning("Nenhum registro encontrado com os filtros selecionados.")
     else:
         # Métricas
         total_acumulado = df_filtrado["Precipitação (mm)"].sum()
@@ -170,20 +171,20 @@ with aba_dash:
         )
         st.plotly_chart(fig_temporal, use_container_width=True)
 
-        # Tabela (Exibe apenas a Data legível YYYY-MM-DD sem as horas 00:00:00)
+        # Tabela (Exibe no formato padrão brasileiro DD/MM/YYYY)
         st.subheader("Dados Filtrados")
         df_exibicao = df_filtrado.copy()
-        df_exibicao["DATA"] = df_exibicao["DATA"].dt.strftime("%Y-%m-%d")
+        df_exibicao["DATA"] = df_exibicao["DATA"].dt.strftime("%d/%m/%Y")
         st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
 
 
 # ============================================================
-# ABA 2: FORMULÁRIO DE LANÇAMENTO (TELEMÓVEL / DESKTOP)
+# ABA 2: FORMULÁRIO DE LANÇAMENTO
 # ============================================================
 with aba_form:
     st.title("📝 Registrar Nova Medição")
     st.caption(
-        "Insira os dados da nova leitura abaixo para guardar diretamente no sistema."
+        "Insira os dados da nova leitura abaixo para salvar diretamente no sistema."
     )
 
     with st.form("form_novo_registro", clear_on_submit=True):
@@ -218,7 +219,7 @@ with aba_form:
                     else 1
                 )
 
-                # Formata a data no padrão dd/mm/YYYY para salvamento correto no Google Sheets
+                # Salva a data no padrão DD/MM/YYYY
                 novo_registro = pd.DataFrame(
                     [
                         {
@@ -240,7 +241,7 @@ with aba_form:
                 # Atualiza no Google Sheets
                 conn.update(worksheet=ABA_EXCEL, data=df_atualizado)
 
-                st.success("✅ Registo adicionado com sucesso!")
+                st.success("✅ Registro adicionado com sucesso!")
                 st.rerun()
 
             except Exception as e:
