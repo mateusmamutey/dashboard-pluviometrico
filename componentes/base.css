@@ -1,0 +1,42 @@
+/* Estilo comum aos componentes animados. O Python injeta este arquivo
+   no marcador de CSS de cada .html. O tema (claro/escuro) vem do
+   Streamlit em data-theme. */
+:root{
+  --bg:transparent; --surface:#ffffff; --surface-2:#eef2f5; --ink:#14222c; --ink-2:#465864; --ink-3:#768896; --line:#d2dbe1;
+  --water:#2f7fb5; --water-deep:#1c5d8a; --water-soft:#d3e6f3;
+  --metal-1:#c3ccd3; --metal-2:#8b98a2; --glass:#e6f0f6;
+  --ok:#2c7a58; --ok-soft:#dcefe5; --warn:#a86d12; --warn-soft:#f8ebd2; --crit:#b23535; --crit-soft:#f7dddd;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Source Sans Pro","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+:root[data-theme="dark"]{
+  --surface:#15212b; --surface-2:#1c2a35; --ink:#e3ebf0; --ink-2:#a8b7c2; --ink-3:#7a8c9c; --line:#2a3a46;
+  --water:#5aa8db; --water-deep:#3c8cc2; --water-soft:#1a3a50;
+  --metal-1:#56636d; --metal-2:#3a4650; --glass:#1a2a36;
+  --ok:#5fc195; --ok-soft:#163a2b; --warn:#e2a74a; --warn-soft:#3b2d14; --crit:#ec7a7a; --crit-soft:#481f22;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:transparent;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0;line-height:1.15}
+.mudo{color:var(--ink-2)}
+.pequeno{font-size:13.5px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.rotulo{font-family:var(--f-display);font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.cartao{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--surface);display:grid;gap:10px}
+.cab{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px 3px 8px;font-family:var(--f-display);font-weight:700;font-size:13.5px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+.chip svg{width:13px;height:13px}
+.chip.tranquilo{background:var(--ok-soft);color:var(--ok)}
+.chip.atencao{background:var(--warn-soft);color:var(--warn)}
+.chip.urgente{background:var(--crit-soft);color:var(--crit)}
+.chip.neutro,.chip.sem_dados{background:var(--surface-2);color:var(--ink-2)}
+.grande{font-family:var(--f-mono);font-size:34px;font-weight:500;line-height:1;letter-spacing:-.02em}
+.grande small{font-size:16px;color:var(--ink-3);margin-left:4px}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:13.5px;margin:0}
+.meta dt{color:var(--ink-3)}
+.meta dd{margin:0;font-family:var(--f-mono);font-size:13px}
+.botao{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;font-weight:600;font-size:14px}
+.botao:hover{border-color:var(--water)}
+:focus-visible{outline:2px solid var(--water);outline-offset:2px}

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/*__CSS__*/
+.comparacao{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:4px;background:var(--surface-2)}
+.comparacao .dif{font-family:var(--f-mono);font-size:26px}
+.comparacao[hidden]{display:none}
+</style>
+</head>
+<body>
+<!-- Registro de uma leitura: a torneira abre, a água escoa, a proveta
+     enche até o valor lido (esvaziando e repetindo se passar da
+     escala), o pluviômetro zera e aparece a comparação entre o
+     pluviógrafo e a proveta. -->
+<div class="cartao">
+  <div class="cab"><h3 id="titulo"></h3><span class="pequeno mudo num" id="passo">pronto</span></div>
+  <div id="desenho"></div>
+  <div class="comparacao" id="comparacao" aria-live="polite" hidden></div>
+  <div><button class="botao" type="button" id="repetir" hidden>Ver de novo</button></div>
+</div>
+<script>
+const DADOS = __DADOS__;
+/*__INSTRUMENTO__*/
+document.documentElement.dataset.theme = DADOS.tema === 'dark' ? 'dark' : 'light';
+
+const cfg = {capacidade: DADOS.capacidade, atencao: 50, urgente: 75, escalaProveta: DADOS.escala_proveta};
+const inst = criarInstrumento(document.getElementById('desenho'), {proveta: true}, cfg);
+const ini = DADOS.mm_pluviografo == null ? Math.min(DADOS.mm_proveta, DADOS.capacidade) : DADOS.mm_pluviografo;
+const lido = Math.max(0, DADOS.mm_proveta);
+const passo = t => { document.getElementById('passo').textContent = t; };
+
+document.getElementById('titulo').textContent = 'Pluviômetro ' + DADOS.estacao;
+
+function estadoInicial() {
+  inst.nivel(ini);
+  inst.torneira(0);
+  inst.proveta(0, false);
+  document.getElementById('comparacao').hidden = true;
+}
+
+function mostrarComparacao(provetas) {
+  const caixa = document.getElementById('comparacao');
+  let html = `<span class="rotulo">Leitura de ${DADOS.quando}</span>`;
+  if (DADOS.mm_pluviografo == null) {
+    html += `<span>Sem dados do pluviógrafo neste intervalo. A proveta leu <b class="num">${fmt(lido)} mm</b>.</span>`;
+  } else if (DADOS.mm_pluviografo < 0.1) {
+    html += `<span>O pluviógrafo não registrou chuva neste intervalo. A proveta leu <b class="num">${fmt(lido)} mm</b>. Vale conferir o pluviógrafo.</span>`;
+  } else {
+    const dif = (lido - DADOS.mm_pluviografo) / DADOS.mm_pluviografo * 100;
+    html += `<span>O pluviógrafo acumulou <b class="num">${fmt(DADOS.mm_pluviografo)} mm</b> neste intervalo. A proveta leu <b class="num">${fmt(lido)} mm</b>${provetas > 1 ? ` em ${provetas} provetas` : ''}.</span>`;
+    html += `<span>Diferença: <span class="dif">${dif >= 0 ? '+' : '−'}${fmt(Math.abs(dif))}%</span></span>`;
+    html += `<span class="pequeno mudo">Esta comparação entra no fator de correção do Histórico.</span>`;
+  }
+  caixa.innerHTML = html;
+  caixa.hidden = false;
+}
+
+async function tocar() {
+  document.getElementById('repetir').hidden = true;
+  estadoInicial();
+  passo('1 · abrindo a torneira');
+  await tween(700, p => inst.torneira(90 * suave(p)));
+
+  let feito = 0, n = 1;
+  const escala = cfg.escalaProveta;
+  while (feito < lido - 1e-6) {
+    const parte = Math.min(escala, lido - feito), a = feito;
+    passo(n === 1 ? '2 · escoando para a proveta' : `2 · escoando (proveta ${n})`);
+    await tween(Math.max(1000, parte / escala * 2800), p => {
+      const q = suave(p);
+      inst.nivel(ini * (1 - (a + parte * q) / lido));
+      inst.proveta(parte * q, true);
+    });
+    feito += parte;
+    if (feito < lido - 1e-6) {
+      passo('3 · proveta cheia: anotar, esvaziar, repetir');
+      inst.proveta(escala, false);
+      await espera(900);
+      await tween(500, p => inst.proveta(escala * (1 - p), false));
+      n++;
+    }
+  }
+  inst.nivel(0);
+  inst.proveta(lido - escala * (n - 1), false);
+  passo('4 · fechando a torneira');
+  await tween(600, p => inst.torneira(90 * (1 - suave(p))));
+  passo('pronto · contagem zerada');
+  mostrarComparacao(n);
+  document.getElementById('repetir').hidden = false;
+}
+
+document.getElementById('repetir').addEventListener('click', tocar);
+if (lido > 0) { tocar(); } else { estadoInicial(); mostrarComparacao(1); }
+</script>
+</body>
+</html>

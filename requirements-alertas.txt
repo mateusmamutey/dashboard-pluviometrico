@@ -1,0 +1,5 @@
+# Só o necessário para alertas.py no GitHub Actions (sem Streamlit).
+pandas
+requests
+gspread>=6
+google-auth

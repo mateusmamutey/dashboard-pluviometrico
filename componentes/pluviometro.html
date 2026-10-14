@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+<!-- Pluviômetro de uma estação: nível com a geometria do cone, régua
+     linear ao lado, marcas das faixas de alerta e o número sempre
+     visível. A água sobe suave do valor anterior até o atual. -->
+<div class="cartao">
+  <div class="cab">
+    <div><h3 id="nome"></h3><div class="pequeno mudo" id="par"></div></div>
+    <span class="chip" id="selo"></span>
+  </div>
+  <div><span class="grande" id="mm"></span><div class="pequeno mudo" id="pct"></div></div>
+  <div id="desenho"></div>
+  <dl class="meta" id="meta"></dl>
+  <div class="pequeno" id="aviso" hidden></div>
+</div>
+<script>
+const DADOS = __DADOS__;
+/*__INSTRUMENTO__*/
+document.documentElement.dataset.theme = DADOS.tema === 'dark' ? 'dark' : 'light';
+
+const cfg = {capacidade: DADOS.capacidade, atencao: DADOS.atencao, urgente: DADOS.urgente, escalaProveta: 125};
+const inst = criarInstrumento(document.getElementById('desenho'), {marcas: true, regua: true}, cfg);
+
+document.getElementById('nome').textContent = DADOS.nome;
+document.getElementById('par').textContent = DADOS.par || '';
+const meta = document.getElementById('meta');
+(DADOS.meta || []).forEach(([rotulo, valor]) => {
+  const dt = document.createElement('dt'), dd = document.createElement('dd');
+  dt.textContent = rotulo;
+  dd.textContent = valor;
+  meta.append(dt, dd);
+});
+
+if (DADOS.aviso) {
+  const aviso = document.getElementById('aviso');
+  aviso.hidden = false;
+  aviso.textContent = DADOS.aviso;
+}
+
+function pintar(mm) {
+  const eMm = document.getElementById('mm');
+  const ePct = document.getElementById('pct');
+
+  if (mm == null) {
+    inst.nivel(0);
+    eMm.innerHTML = '—<small>mm</small>';
+    ePct.textContent = 'Sem dados do pluviógrafo';
+    selo(document.getElementById('selo'), 'sem_dados');
+    return;
+  }
+
+  inst.nivel(mm);
+  eMm.innerHTML = fmt(mm) + '<small>mm</small>';
+  const f = mm / cfg.capacidade;
+  ePct.textContent = f > 1
+    ? `${Math.round(f * 100)}% da capacidade · pode ter transbordado`
+    : `${Math.round(f * 100)}% da capacidade · cabem mais ${fmt(cfg.capacidade - mm, 0)} mm`;
+  selo(document.getElementById('selo'), faixaDe(mm, cfg));
+}
+
+if (DADOS.mm == null) {
+  pintar(null);
+} else {
+  const de = DADOS.mm_anterior == null ? DADOS.mm : DADOS.mm_anterior;
+  const ate = DADOS.mm;
+  pintar(de);
+  if (de !== ate) {
+    tween(1600, p => pintar(de + (ate - de) * suave(p)));
+  }
+}
+</script>
+</body>
+</html>

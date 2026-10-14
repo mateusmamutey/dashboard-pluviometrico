@@ -1,0 +1,13 @@
+# Segredos: nunca vão para o git
+.streamlit/secrets.toml
+*.json.key
+credenciais*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Saídas do diagnóstico
+registros*.csv

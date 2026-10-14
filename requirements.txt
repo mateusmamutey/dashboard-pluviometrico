@@ -1,5 +1,6 @@
-streamlit
+streamlit>=1.63
 pandas
 plotly
 openpyxl
 st-gsheets-connection
+requests

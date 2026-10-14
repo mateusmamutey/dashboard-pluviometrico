@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/*__CSS__*/
+.tela{position:relative;border-radius:8px;overflow:hidden;background:linear-gradient(var(--glass),var(--surface-2));aspect-ratio:4/3;max-height:260px;border:1px solid var(--line)}
+.tela canvas{position:absolute;inset:0;width:100%;height:100%}
+.tela .sobre{position:absolute;left:12px;top:10px;display:grid;gap:4px;justify-items:start}
+.escala{display:grid;gap:3px;font-size:13.5px}
+.faixa{display:grid;grid-template-columns:54px 1fr auto;gap:8px;align-items:center;padding:3px 6px;border-radius:6px}
+.faixa.atual{background:var(--water-soft);font-weight:600}
+.faixa .amostra{height:18px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+</style>
+</head>
+<body>
+<!-- Chuva caindo com a intensidade real da estação. Densidade e
+     velocidade dos pingos seguem cinco faixas de mm/h, e a escala ao
+     lado é a legenda: quem olha aprende a ler intensidade de chuva. -->
+<div class="cartao">
+  <h3>Chuva agora na estação</h3>
+  <div class="tela">
+    <canvas id="canvas" aria-hidden="true"></canvas>
+    <div class="sobre"><span class="grande" id="valor"></span><span class="chip neutro" id="nomeFaixa"></span></div>
+  </div>
+  <div class="escala" id="escala"></div>
+  <div class="pequeno mudo" id="detalhe"></div>
+</div>
+<script>
+const DADOS = __DADOS__;
+/*__INSTRUMENTO__*/
+document.documentElement.dataset.theme = DADOS.tema === 'dark' ? 'dark' : 'light';
+
+const FAIXAS = [
+  {nome: 'Sem chuva', faixa: '0', n: 0},
+  {nome: 'Fraca', faixa: '< 2,5', n: 3},
+  {nome: 'Moderada', faixa: '2,5 – 10', n: 8},
+  {nome: 'Forte', faixa: '10 – 50', n: 16},
+  {nome: 'Muito forte', faixa: '> 50', n: 30},
+];
+const faixaDaIntensidade = i => i == null || i <= 0 ? 0 : i < 2.5 ? 1 : i < 10 ? 2 : i < 50 ? 3 : 4;
+const intensidade = DADOS.intensidade == null ? null : Math.max(0, DADOS.intensidade);
+const k = faixaDaIntensidade(intensidade);
+
+document.getElementById('escala').innerHTML = '<span class="rotulo">Escala · mm/h</span>' + FAIXAS.map((f, j) => {
+  let s = '';
+  for (let q = 0; q < f.n; q++) {
+    const x = ((q * 37 + j * 11) % 50) + 2, y = ((q * 23 + j * 7) % 10) + 2;
+    s += `<line x1="${x}" y1="${y}" x2="${x - 1.2}" y2="${y + 5}" stroke="var(--water)" stroke-width="1.1" stroke-linecap="round"/>`;
+  }
+  const atual = intensidade != null && j === k ? ' atual' : '';
+  return `<div class="faixa${atual}"><span class="amostra"><svg viewBox="0 0 54 18" width="54" height="18">${s}</svg></span><span>${f.nome}</span><span class="num">${f.faixa}</span></div>`;
+}).join('');
+
+const eValor = document.getElementById('valor');
+const eNome = document.getElementById('nomeFaixa');
+if (intensidade == null) {
+  eValor.innerHTML = '—<small>mm/h</small>';
+  eNome.textContent = 'Sem dados recentes';
+} else {
+  eValor.innerHTML = fmt(intensidade) + '<small>mm/h</small>';
+  eNome.textContent = FAIXAS[k].nome + (DADOS.satura ? ' · satura o pluviógrafo' : '');
+  eNome.className = 'chip ' + (DADOS.satura ? 'urgente' : 'neutro');
+}
+document.getElementById('detalhe').textContent = DADOS.detalhe || '';
+
+/* ---- pingos ---- */
+const cv = document.getElementById('canvas'), ctx = cv.getContext('2d');
+let W = 0, Hc = 0;
+const gotas = [], respingos = [];
+const corAgua = getComputedStyle(document.documentElement).getPropertyValue('--water').trim() || '#2f7fb5';
+const i = intensidade || 0;
+const total = i <= 0 ? 0 : Math.min(520, Math.round(5 + 4.6 * i));
+const vento = .1 + i * .004;
+
+function dimensionar() {
+  const r = cv.getBoundingClientRect();
+  if (!r.width) return;
+  const d = Math.min(2, devicePixelRatio || 1);
+  W = r.width; Hc = r.height;
+  cv.width = Math.round(W * d); cv.height = Math.round(Hc * d);
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  desenhar();
+}
+function novaGota(g, espalhar) {
+  g.x = Math.random() * (W + 60) - 40;
+  g.y = espalhar ? Math.random() * Hc * 1.2 - Hc * .2 : -Math.random() * 30;
+  g.v = (1.6 + .05 * i) * (.8 + Math.random() * .4) * Math.max(1, Hc / 240);
+  g.l = (9 + .25 * i) * (.7 + Math.random() * .6);
+  return g;
+}
+function desenhar() {
+  while (gotas.length < total) gotas.push(novaGota({}, true));
+  ctx.clearRect(0, 0, W, Hc);
+  ctx.strokeStyle = corAgua; ctx.lineCap = 'round'; ctx.globalAlpha = .9; ctx.lineWidth = i > 50 ? 2.2 : 1.6;
+  ctx.beginPath();
+  for (const g of gotas) { ctx.moveTo(g.x, g.y); ctx.lineTo(g.x - vento * g.l, g.y - g.l); }
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  for (const r of respingos) {
+    ctx.globalAlpha = r.a * .7;
+    ctx.beginPath(); ctx.ellipse(r.x, r.y, r.r * 1.8, r.r * .6, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+function passo() {
+  for (const g of gotas) {
+    g.y += g.v; g.x += g.v * vento;
+    if (g.y - g.l > Hc) {
+      if (i >= 10 && respingos.length < 80 && Math.random() < .35) respingos.push({x: g.x, y: Hc - 3, r: 1, a: 1});
+      novaGota(g, false);
+    }
+  }
+  for (let q = respingos.length - 1; q >= 0; q--) {
+    const r = respingos[q]; r.r += .35; r.a -= .06;
+    if (r.a <= 0) respingos.splice(q, 1);
+  }
+}
+new ResizeObserver(dimensionar).observe(cv);
+function quadro() {
+  if (W && total) { passo(); desenhar(); }
+  requestAnimationFrame(quadro);
+}
+if (!reduzMovimento) requestAnimationFrame(quadro);
+</script>
+</body>
+</html>

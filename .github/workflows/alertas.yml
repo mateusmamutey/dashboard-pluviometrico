@@ -1,0 +1,59 @@
+# Alertas do pluviômetro: roda a cada 15 minutos, sem depender de
+# alguém abrir o dashboard. Os segredos ficam em
+# Settings → Secrets and variables → Actions (veja LEIAME-CONFIGURACAO.md).
+#
+# Para testar à mão: aba Actions → "Alertas do pluviômetro" → Run workflow.
+
+name: Alertas do pluviômetro
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "normal, teste (só mostra) ou mensagem-teste"
+        required: true
+        default: "teste"
+        type: choice
+        options: [normal, teste, mensagem-teste]
+
+concurrency:
+  group: alertas
+  cancel-in-progress: false
+
+jobs:
+  alertas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-alertas.txt
+
+      - run: pip install -r requirements-alertas.txt
+
+      - name: Avaliar e enviar alertas
+        env:
+          LICOR_TOKEN: ${{ secrets.LICOR_TOKEN }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          PLANILHA_URL: ${{ secrets.PLANILHA_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORTA: ${{ secrets.SMTP_PORTA }}
+          SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
+          SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
+          SMTP_REMETENTE: ${{ secrets.SMTP_REMETENTE }}
+          MODO: ${{ github.event.inputs.modo || 'normal' }}
+        run: |
+          if [ "$MODO" = "teste" ]; then
+            python alertas.py --teste
+          elif [ "$MODO" = "mensagem-teste" ]; then
+            python alertas.py --mensagem-teste
+          else
+            python alertas.py
+          fi
