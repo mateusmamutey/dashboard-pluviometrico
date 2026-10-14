@@ -50,6 +50,12 @@ jobs:
           SMTP_REMETENTE: ${{ secrets.SMTP_REMETENTE }}
           MODO: ${{ github.event.inputs.modo || 'normal' }}
         run: |
+          # Enquanto os segredos não forem configurados, não falha a
+          # cada 15 min (o GitHub mandaria um e-mail por falha).
+          if [ -z "$PLANILHA_URL" ] || [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::notice::Segredos dos alertas ainda não configurados. Veja LEIAME-CONFIGURACAO.md."
+            exit 0
+          fi
           if [ "$MODO" = "teste" ]; then
             python alertas.py --teste
           elif [ "$MODO" = "mensagem-teste" ]; then
