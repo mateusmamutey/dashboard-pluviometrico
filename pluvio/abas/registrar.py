@@ -21,7 +21,7 @@ from pluvio.acumulado import (
     ultimo_esvaziamento,
 )
 from pluvio.constantes import ABAS_PLUVIOMETROS
-from pluvio.licor_api import FUSO_ESTACAO
+from pluvio.licor_api import FUSO_ESTACAO, agora_utc
 from pluvio.planilha import converter_datas, limpar_hora, padronizar_colunas
 
 
@@ -158,8 +158,13 @@ def mostrar(contexto):
 
             col_data, col_hora = st.columns(2)
 
-            nova_data = col_data.date_input("Data da medição", value=datetime.now().date())
-            nova_hora = col_hora.time_input("Hora da medição", value=time(8, 0))
+            # O servidor do Streamlit Cloud roda em UTC: a data e a hora
+            # sugeridas vêm do relógio da estação (-03).
+            agora_local = agora_utc().tz_convert(FUSO_ESTACAO)
+            hora_sugerida = time(8, 0) if agora_local.hour >= 8 else time(agora_local.hour, agora_local.minute)
+
+            nova_data = col_data.date_input("Data da medição", value=agora_local.date())
+            nova_hora = col_hora.time_input("Hora da medição", value=hora_sugerida)
 
             nova_precipitacao = st.number_input(
                 "Leitura da proveta (mm)",
@@ -189,6 +194,15 @@ def mostrar(contexto):
 
         momento = pd.Timestamp(datetime.combine(nova_data, nova_hora)).tz_localize(FUSO_ESTACAO)
 
+        # Leitura no futuro viraria o "último esvaziamento" e zeraria a
+        # aba Agora e os alertas até aquela hora chegar.
+        if momento > agora_utc() + pd.Timedelta(minutes=10):
+            coluna_form.warning(
+                f"⚠️ {nova_data.strftime('%d/%m/%Y')} às {nova_hora.strftime('%H:%M')} "
+                "ainda não chegou. Confira a data e a hora da medição."
+            )
+            return
+
         try:
             mm_pluviografo = chuva_do_pluviografo(contexto, estacao, momento)
         except Exception:
@@ -207,6 +221,7 @@ def mostrar(contexto):
             ok, mensagem = False, f"❌ Erro ao salvar o registro:\n\n{exc}"
 
         if ok:
+            br_mm = f"{nova_precipitacao:.1f}".replace(".", ",")
             st.session_state[CHAVE_ANIMACAO] = {
                 "estacao": estacao,
                 "mm_pluviografo": mm_pluviografo,
@@ -217,7 +232,7 @@ def mostrar(contexto):
                 "mensagem": (
                     f"{mensagem} Estação {estacao}, "
                     f"{nova_data.strftime('%d/%m/%Y')} {nova_hora.strftime('%H:%M')}, "
-                    f"{nova_precipitacao:.1f} mm."
+                    f"{br_mm} mm."
                 ),
             }
             st.session_state.pop(f"mm_anterior_{estacao}", None)

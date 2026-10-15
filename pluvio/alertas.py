@@ -133,10 +133,26 @@ def avaliar(config, estado, estacoes, ultima_conexao, agora, hoje):
     # --------------------------------------------------------
     # Estação muda
     # --------------------------------------------------------
+    # ultima_conexao None = não deu para perguntar ao LI-COR (sem token
+    # ou falha da API). Aí não se sabe se a estação está muda, e a
+    # regra fica de fora em vez de mandar um alarme falso.
+
+    if ultima_conexao is not None:
+        _vigiar_estacao(config, estado, novo, mensagens, ultima_conexao, agora)
+
+    # --------------------------------------------------------
+    # Vencimento do plano
+    # --------------------------------------------------------
+
+    _vigiar_plano(config, estado, novo, mensagens, hoje)
+
+    return mensagens, novo
+
+
+def _vigiar_estacao(config, estado, novo, mensagens, ultima_conexao, agora):
 
     muda = (
-        ultima_conexao is None
-        or pd.isna(ultima_conexao)
+        pd.isna(ultima_conexao)
         or (agora - ultima_conexao) > pd.Timedelta(minutes=config.estacao_muda_minutos)
     )
 
@@ -159,9 +175,8 @@ def avaliar(config, estado, estacoes, ultima_conexao, agora, hoje):
 
     novo["estacao_muda"] = "sim" if muda else "nao"
 
-    # --------------------------------------------------------
-    # Vencimento do plano
-    # --------------------------------------------------------
+
+def _vigiar_plano(config, estado, novo, mensagens, hoje):
 
     vencimento = config.data_vencimento_plano()
 
@@ -190,8 +205,6 @@ def avaliar(config, estado, estacoes, ultima_conexao, agora, hoje):
 
             mensagens.append(Mensagem("Plano da estação", texto))
             novo["plano_aviso"] = str(marco)
-
-    return mensagens, novo
 
 
 # ============================================================

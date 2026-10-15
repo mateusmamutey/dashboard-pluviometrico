@@ -3,13 +3,12 @@ Barra lateral: configuração em uso, estado da estação e atualizar.
 Os filtros de data, ano, mês e estação ficam dentro do Histórico.
 """
 
-from datetime import date
-
 import pandas as pd
 import streamlit as st
 
 from pluvio import fontes
 from pluvio.contexto import ha_quanto, momento_local
+from pluvio.licor_api import FUSO_ESTACAO, agora_utc
 
 
 def dias_para_vencer(config):
@@ -19,7 +18,10 @@ def dias_para_vencer(config):
     if vencimento is None:
         return None
 
-    return (vencimento - date.today()).days
+    # Dia de hoje na estação (o servidor roda em UTC)
+    hoje = agora_utc().tz_convert(FUSO_ESTACAO).date()
+
+    return (vencimento - hoje).days
 
 
 def mostrar(contexto):
