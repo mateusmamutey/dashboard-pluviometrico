@@ -192,6 +192,12 @@ def limpar_hora(valor):
     if pd.isna(valor):
         return "-"
 
+    # Número de série do Sheets: fração do dia (0,375 = 09:00).
+    # Data com hora (45930,375) também serve: fica só a parte da hora.
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        segundos = round((float(valor) % 1) * 86400)
+        return f"{segundos // 3600 % 24:02d}:{segundos // 60 % 60:02d}:{segundos % 60:02d}"
+
     if isinstance(valor, time):
         return valor.strftime("%H:%M:%S")
 
@@ -221,28 +227,67 @@ def limpar_hora(valor):
 
 def converter_datas(serie):
     """
-    Converte a coluna DATA aceitando datetime, texto ISO (AAAA-MM-DD,
-    que é como o formulário grava) e texto brasileiro (DD/MM/AAAA).
+    Converte a coluna DATA aceitando:
+    - número de série do Sheets (dias desde 30/12/1899), que é como a
+      planilha é lida, sem ambiguidade de dia e mês;
+    - datetime;
+    - texto ISO (AAAA-MM-DD, que é como o formulário antigo gravava);
+    - texto brasileiro (DD/MM/AAAA).
 
     Com dayfirst=True o pandas lê '2026-10-05' como 10 de maio. Por
-    isso o texto ISO é convertido à parte, sem dayfirst.
+    isso o texto ISO é convertido à parte, sem dayfirst. Texto ISO com
+    dia e mês trocados ('2026-14-09') é lido como AAAA-DD-MM em vez de
+    ser descartado.
     """
 
-    texto = serie.astype(str).str.strip()
-    iso = texto.str.match(r"^\d{4}-\d{2}-\d{2}")
+    serie = pd.Series(serie)
+    resultado = pd.Series(pd.NaT, index=serie.index, dtype="datetime64[ns]")
 
-    resultado = pd.to_datetime(
-        serie.where(~iso),
-        dayfirst=True,
-        errors="coerce",
-        format="mixed"
+    # Número de série
+    numerico = serie.map(
+        lambda valor: isinstance(valor, (int, float)) and not isinstance(valor, bool) and not pd.isna(valor)
     )
 
-    resultado[iso] = pd.to_datetime(
-        texto[iso].str[:10],
-        format="%Y-%m-%d",
-        errors="coerce"
-    )
+    if numerico.any():
+        dias = serie[numerico].astype(float).map(lambda valor: int(valor // 1))
+        resultado[numerico] = pd.Timestamp("1899-12-30") + pd.to_timedelta(dias, unit="D")
+
+    # datetime/Timestamp já prontos
+    pronto = serie.map(lambda valor: isinstance(valor, (datetime, pd.Timestamp)))
+
+    if pronto.any():
+        resultado[pronto] = pd.to_datetime(serie[pronto]).dt.tz_localize(None)
+
+    # Texto
+    texto = serie.where(~(numerico | pronto)).astype(str).str.strip()
+    texto = texto.where(~(numerico | pronto) & ~texto.isin(["", "nan", "None", "NaT"]))
+    tem_texto = texto.notna()
+
+    iso = tem_texto & texto.str.match(r"^\d{4}-\d{2}-\d{2}")
+    brasileiro = tem_texto & ~iso
+
+    if brasileiro.any():
+        resultado[brasileiro] = pd.to_datetime(
+            texto[brasileiro],
+            dayfirst=True,
+            errors="coerce",
+            format="mixed"
+        )
+
+    if iso.any():
+        resultado[iso] = pd.to_datetime(
+            texto[iso].str[:10],
+            format="%Y-%m-%d",
+            errors="coerce"
+        )
+
+        trocado = iso & resultado.isna()
+
+        resultado[trocado] = pd.to_datetime(
+            texto[trocado].str[:10],
+            format="%Y-%d-%m",
+            errors="coerce"
+        )
 
     return resultado
 

@@ -34,52 +34,12 @@ from pluvio.licor_api import (
     ultima_conexao,
 )
 from pluvio.planilha import tratar_estacao
+from pluvio.sheets import Planilha
 
 
 # ============================================================
-# GOOGLE SHEETS (gspread, sem Streamlit)
+# ESTADO DOS ALERTAS (aba alertas_estado)
 # ============================================================
-
-class Planilha:
-
-    def __init__(self, url, credenciais_json):
-        import gspread
-
-        cliente = gspread.service_account_from_dict(json.loads(credenciais_json))
-        self.planilha = cliente.open_by_url(url)
-
-    def ler(self, aba):
-        """DataFrame da aba, ou None se ela não existir."""
-
-        import gspread
-
-        try:
-            valores = self.planilha.worksheet(aba).get_all_values()
-        except gspread.WorksheetNotFound:
-            return None
-
-        if not valores:
-            return pd.DataFrame()
-
-        return pd.DataFrame(valores[1:], columns=valores[0])
-
-    def gravar_estado(self, estado):
-
-        import gspread
-
-        try:
-            folha = self.planilha.worksheet(ABA_ESTADO_ALERTAS)
-        except gspread.WorksheetNotFound:
-            folha = self.planilha.add_worksheet(ABA_ESTADO_ALERTAS, rows=50, cols=3)
-
-        agora = pd.Timestamp.now(tz=FUSO_ESTACAO).strftime("%d/%m/%Y %H:%M")
-        linhas = [["chave", "valor", "atualizado"]] + [
-            [chave, str(valor), agora] for chave, valor in sorted(estado.items())
-        ]
-
-        folha.clear()
-        folha.update(values=linhas, range_name="A1")
-
 
 def ler_estado(df):
 
@@ -111,7 +71,7 @@ def main():
             print(f"Falta a variável {nome}. Veja LEIAME-CONFIGURACAO.md.")
             return 1
 
-    planilha = Planilha(ambiente["PLANILHA_URL"], ambiente["GOOGLE_SERVICE_ACCOUNT_JSON"])
+    planilha = Planilha(ambiente["PLANILHA_URL"], json.loads(ambiente["GOOGLE_SERVICE_ACCOUNT_JSON"]))
 
     config, avisos = montar_config(config_do_ambiente(ambiente), config_da_aba(planilha.ler(ABA_CONFIG)))
 
@@ -157,7 +117,7 @@ def main():
 
     for estacao, aba in ABAS_PLUVIOMETROS.items():
 
-        manual = tratar_estacao(planilha.ler(aba), aba)
+        manual = tratar_estacao(planilha.ler(aba, seriais=True), aba)
         esvaziamento = ultimo_esvaziamento(manual)
         registros = None
 
@@ -204,7 +164,11 @@ def main():
         return 0
 
     enviar(mensagens, contatos, smtp)
-    planilha.gravar_estado(novo_estado)
+    planilha.gravar_estado(
+        ABA_ESTADO_ALERTAS,
+        novo_estado,
+        pd.Timestamp.now(tz=FUSO_ESTACAO).strftime("%d/%m/%Y %H:%M"),
+    )
 
     return 0
 

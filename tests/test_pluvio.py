@@ -365,5 +365,84 @@ class TesteBacia(unittest.TestCase):
         self.assertAlmostEqual(subida, 0.2)
 
 
+# ============================================================
+# GOOGLE SHEETS (datas como número de série, linha nova no fim)
+# ============================================================
+
+class FolhaFalsa:
+    def __init__(self, valores):
+        self.title = "dados_rio"
+        self.row_count = len(valores) + 5
+        self.valores = valores
+        self.gravado = None
+        self.formatos = None
+
+    def row_values(self, linha):
+        return self.valores[linha - 1]
+
+    def update(self, values, range_name, value_input_option):
+        self.gravado = (range_name, values, value_input_option)
+
+    def batch_format(self, formatos):
+        self.formatos = formatos
+
+
+class PlanilhaFalsa:
+    def __init__(self, folha):
+        self.folha = folha
+
+    def worksheet(self, aba):
+        return self.folha
+
+    def values_get(self, intervalo, params=None):
+        return {"values": self.folha.valores}
+
+
+class TestePlanilha(unittest.TestCase):
+
+    def test_datas_americanas_lidas_pelo_serial(self):
+        # 02/09/2026 numa célula com formato americano aparece como
+        # "9/2/2026" na tela; o número de série não deixa dúvida.
+        serial_2_set = (pd.Timestamp("2026-09-02") - pd.Timestamp("1899-12-30")).days
+        df = tratar_estacao(
+            pd.DataFrame(
+                [
+                    [1, serial_2_set, 0.40625, 83.4, ""],
+                    [2, "2026-14-09", 15 / 24, 69.4, "-"],
+                    [3, "9/13/2021", "10:15", "7,6", ""],
+                    [4, "", "", "", ""],
+                ],
+                columns=["indice", "DATA", "HORA", "Precipitação (mm)", "Observações"],
+            ),
+            "teste",
+        )
+        self.assertEqual(
+            [d.strftime("%Y-%m-%d") for d in df["DATA"]],
+            ["2021-09-13", "2026-09-02", "2026-09-14"],
+        )
+        self.assertEqual(df["HORA"].tolist(), ["10:15:00", "09:45:00", "15:00:00"])
+        self.assertEqual(df["Observações"].tolist(), ["-", "-", "-"])
+
+    def test_acrescenta_so_a_linha_nova(self):
+        from datetime import time
+        from pluvio.sheets import Planilha
+
+        folha = FolhaFalsa([
+            ["indice", "DATA", "HORA", "Precipitação (mm)", "Observações"],
+            [1, 46267, 0.4, 10, ""],
+            [2, 46270, 0.4, 0, ""],
+        ])
+        planilha = Planilha.__new__(Planilha)
+        planilha.planilha = PlanilhaFalsa(folha)
+
+        planilha.acrescentar_leitura("dados_rio", 3, date(2026, 10, 15), time(9, 0), 12.5, "")
+
+        intervalo, valores, modo = folha.gravado
+        self.assertEqual(intervalo, "A4:E4")
+        self.assertEqual(modo, "RAW")
+        self.assertEqual(valores, [[3, 46310, 0.375, 12.5, "-"]])
+        self.assertEqual([f["range"] for f in folha.formatos], ["B4", "C4"])
+
+
 if __name__ == "__main__":
     unittest.main()

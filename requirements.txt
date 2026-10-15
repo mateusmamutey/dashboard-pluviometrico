@@ -2,5 +2,6 @@ streamlit>=1.63
 pandas
 plotly
 openpyxl
-st-gsheets-connection
+gspread>=6
+google-auth
 requests
