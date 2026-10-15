@@ -18,7 +18,6 @@ import argparse
 import json
 import os
 import sys
-from datetime import date
 
 import pandas as pd
 
@@ -145,10 +144,12 @@ def main():
     agora = agora_utc()
     cliente = None
     dispositivo = None
+    api_respondeu = False
 
     try:
         cliente = ClienteLicor(token_licor({}, ambiente))
         dispositivo = achar_dispositivo(cliente.dispositivos(), config.licor_dispositivo)
+        api_respondeu = True
     except ErroLicor as exc:
         print(f"LI-COR: {exc}")
 
@@ -186,9 +187,10 @@ def main():
         config,
         estado,
         estacoes,
-        ultima_conexao(dispositivo),
+        # Sem resposta da API não dá para saber se a estação está muda
+        ultima_conexao(dispositivo) if api_respondeu else None,
         agora,
-        date.today(),
+        agora.tz_convert(FUSO_ESTACAO).date(),
     )
 
     if not mensagens:

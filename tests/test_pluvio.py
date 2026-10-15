@@ -303,6 +303,15 @@ class TesteAlertas(unittest.TestCase):
         msgs, _ = avaliar(self.config, estado, {}, self.conexao, self.agora, date(2026, 10, 14))
         self.assertEqual([m.assunto for m in msgs], ["Estação voltou"])
 
+    def test_sem_api_nao_avisa_estacao_muda(self):
+        msgs, estado = avaliar(self.config, {}, {}, None, self.agora, date(2026, 10, 14))
+        self.assertEqual(msgs, [])
+        self.assertNotIn("estacao_muda", estado)
+
+    def test_estacao_nao_encontrada_avisa(self):
+        msgs, _ = avaliar(self.config, {}, {}, pd.NaT, self.agora, date(2026, 10, 14))
+        self.assertEqual([m.assunto for m in msgs], ["Estação sem dados"])
+
     def test_plano(self):
         dia = lambda d: avaliar(self.config, estado, {}, self.conexao, self.agora, d)
         estado = {}
