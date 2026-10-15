@@ -7,15 +7,17 @@ Alertas do pluviômetro, para rodar agendado no GitHub Actions
     python alertas.py --mensagem-teste   manda uma mensagem de teste aos contatos
 
 Variáveis de ambiente (segredos do GitHub):
-    LICOR_TOKEN                   token do LI-COR Cloud
-    GOOGLE_SERVICE_ACCOUNT_JSON   JSON da conta de serviço do Google Sheets
-    PLANILHA_URL                  endereço da planilha
-    SMTP_HOST, SMTP_PORTA, SMTP_USUARIO, SMTP_SENHA, SMTP_REMETENTE
-    PLUVIO_*                      sobrepõe chaves da configuração (opcional)
+    STREAMLIT_SECRETS             texto inteiro dos Secrets do Streamlit Cloud
+                                  (planilha, conta de serviço e token do LI-COR)
+    SMTP_USUARIO, SMTP_SENHA      e-mail que envia e a senha de app (Gmail)
+
+Opcionais (vencem o STREAMLIT_SECRETS):
+    PLANILHA_URL, GOOGLE_SERVICE_ACCOUNT_JSON, LICOR_TOKEN
+    SMTP_HOST, SMTP_PORTA, SMTP_REMETENTE (padrão: Gmail, 587, o próprio usuário)
+    PLUVIO_*                      sobrepõe chaves da configuração
 """
 
 import argparse
-import json
 import os
 import sys
 
@@ -23,7 +25,7 @@ import pandas as pd
 
 from pluvio.acumulado import resumo_desde_esvaziamento, ultimo_esvaziamento
 from pluvio.alertas import Mensagem, avaliar, contatos_da_aba, enviar
-from pluvio.config import config_da_aba, config_do_ambiente, montar_config, token_licor
+from pluvio.config import config_da_aba, config_do_ambiente, montar_config, segredos_dos_alertas
 from pluvio.constantes import ABA_CONFIG, ABA_CONTATOS, ABA_ESTADO_ALERTAS, ABAS_PLUVIOMETROS
 from pluvio.licor_api import (
     FUSO_ESTACAO,
@@ -66,12 +68,20 @@ def main():
 
     ambiente = os.environ
 
-    for nome in ["PLANILHA_URL", "GOOGLE_SERVICE_ACCOUNT_JSON"]:
-        if not ambiente.get(nome):
-            print(f"Falta a variável {nome}. Veja LEIAME-CONFIGURACAO.md.")
-            return 1
+    try:
+        url, credenciais, token, smtp = segredos_dos_alertas(ambiente)
+    except ValueError as exc:
+        print(exc)
+        return 1
 
-    planilha = Planilha(ambiente["PLANILHA_URL"], json.loads(ambiente["GOOGLE_SERVICE_ACCOUNT_JSON"]))
+    if not url or not credenciais:
+        print(
+            "Faltam a planilha e a conta de serviço. Cole o texto dos Secrets "
+            "do Streamlit no segredo STREAMLIT_SECRETS. Veja LEIAME-CONFIGURACAO.md."
+        )
+        return 1
+
+    planilha = Planilha(url, credenciais)
 
     config, avisos = montar_config(config_do_ambiente(ambiente), config_da_aba(planilha.ler(ABA_CONFIG)))
 
@@ -79,15 +89,13 @@ def main():
         print("Aviso de configuração:", aviso)
 
     contatos = contatos_da_aba(planilha.ler(ABA_CONTATOS))
-    smtp = {
-        "host": ambiente.get("SMTP_HOST"),
-        "porta": ambiente.get("SMTP_PORTA", "587"),
-        "usuario": ambiente.get("SMTP_USUARIO"),
-        "senha": ambiente.get("SMTP_SENHA"),
-        "remetente": ambiente.get("SMTP_REMETENTE"),
-    }
-
     print(f"{len(contatos)} contato(s) na aba {ABA_CONTATOS}.")
+
+    if not contatos:
+        print(f"Ninguém vai receber: crie a aba '{ABA_CONTATOS}' na planilha (veja LEIAME-CONFIGURACAO.md).")
+
+    if not smtp["usuario"]:
+        print("Sem SMTP_USUARIO e SMTP_SENHA: e-mails não serão enviados (WhatsApp continua).")
 
     if args.mensagem_teste:
         enviar(
@@ -107,7 +115,7 @@ def main():
     api_respondeu = False
 
     try:
-        cliente = ClienteLicor(token_licor({}, ambiente))
+        cliente = ClienteLicor(token)
         dispositivo = achar_dispositivo(cliente.dispositivos(), config.licor_dispositivo)
         api_respondeu = True
     except ErroLicor as exc:

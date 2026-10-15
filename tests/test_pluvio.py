@@ -444,5 +444,45 @@ class TestePlanilha(unittest.TestCase):
         self.assertEqual([f["range"] for f in folha.formatos], ["B4", "C4"])
 
 
+class TesteSegredosAlertas(unittest.TestCase):
+
+    TOML = (
+        '[connections.gsheets]\n'
+        'spreadsheet = "https://docs.google.com/spreadsheets/d/abc"\n'
+        'type = "service_account"\n'
+        'private_key = "-----BEGIN PRIVATE KEY-----\\nXYZ\\n-----END PRIVATE KEY-----\\n"\n'
+        'client_email = "conta@projeto.iam.gserviceaccount.com"\n'
+        '\n[licor]\ntoken = "tok"\n'
+    )
+
+    def test_texto_do_streamlit_basta(self):
+        from pluvio.config import segredos_dos_alertas
+
+        url, cred, token, smtp = segredos_dos_alertas(
+            {"STREAMLIT_SECRETS": self.TOML, "SMTP_USUARIO": "lab@gmail.com", "SMTP_SENHA": "x", "SMTP_PORTA": ""}
+        )
+        self.assertEqual(url, "https://docs.google.com/spreadsheets/d/abc")
+        self.assertEqual(cred["type"], "service_account")
+        self.assertNotIn("spreadsheet", cred)
+        self.assertIn("\nXYZ\n", cred["private_key"])
+        self.assertEqual(token, "tok")
+        self.assertEqual((smtp["host"], smtp["porta"], smtp["remetente"]), ("smtp.gmail.com", "587", "lab@gmail.com"))
+
+    def test_segredos_separados_vencem(self):
+        from pluvio.config import segredos_dos_alertas
+
+        url, cred, token, smtp = segredos_dos_alertas(
+            {"STREAMLIT_SECRETS": self.TOML, "PLANILHA_URL": "u", "GOOGLE_SERVICE_ACCOUNT_JSON": '{"a": 1}', "LICOR_TOKEN": "t2"}
+        )
+        self.assertEqual((url, cred, token), ("u", {"a": 1}, "t2"))
+        self.assertIsNone(smtp["host"])
+
+    def test_texto_quebrado_avisa(self):
+        from pluvio.config import segredos_dos_alertas
+
+        with self.assertRaises(ValueError):
+            segredos_dos_alertas({"STREAMLIT_SECRETS": "[connections.gsheets\nx ="})
+
+
 if __name__ == "__main__":
     unittest.main()

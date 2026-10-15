@@ -250,3 +250,59 @@ def token_licor(segredos, ambiente):
         return str(token).strip()
 
     return None
+
+
+def segredos_dos_alertas(ambiente):
+    """
+    Segredos do alertas.py no GitHub Actions. Retorna
+    (url_planilha, credenciais_google, token_licor, smtp).
+
+    O jeito simples é um segredo só, STREAMLIT_SECRETS, com o texto
+    inteiro dos Secrets do Streamlit Cloud colado: dele saem a planilha,
+    a conta de serviço e o token do LI-COR. Os segredos separados
+    (PLANILHA_URL, GOOGLE_SERVICE_ACCOUNT_JSON, LICOR_TOKEN) continuam
+    valendo e vencem o STREAMLIT_SECRETS.
+
+    E-mail: bastam SMTP_USUARIO e SMTP_SENHA. Servidor e porta são os
+    do Gmail se SMTP_HOST e SMTP_PORTA não forem dados, e o remetente
+    é o próprio usuário.
+    """
+
+    import json
+    import tomllib
+
+    streamlit = {}
+    texto = (ambiente.get("STREAMLIT_SECRETS") or "").strip()
+
+    if texto:
+        try:
+            streamlit = tomllib.loads(texto)
+        except tomllib.TOMLDecodeError as exc:
+            raise ValueError(
+                "O segredo STREAMLIT_SECRETS não é um texto TOML válido. "
+                f"Copie de novo o conteúdo inteiro dos Secrets do Streamlit. ({exc})"
+            )
+
+    gsheets = dict(streamlit.get("connections", {}).get("gsheets", {}))
+    url = (ambiente.get("PLANILHA_URL") or "").strip() or gsheets.pop("spreadsheet", None)
+    gsheets.pop("spreadsheet", None)
+    gsheets.pop("worksheet", None)
+
+    if (ambiente.get("GOOGLE_SERVICE_ACCOUNT_JSON") or "").strip():
+        credenciais = json.loads(ambiente["GOOGLE_SERVICE_ACCOUNT_JSON"])
+    else:
+        credenciais = gsheets or None
+
+    usuario = (ambiente.get("SMTP_USUARIO") or "").strip()
+
+    smtp = {
+        "host": (ambiente.get("SMTP_HOST") or "").strip() or ("smtp.gmail.com" if usuario else None),
+        "porta": (ambiente.get("SMTP_PORTA") or "").strip() or "587",
+        "usuario": usuario or None,
+        "senha": ambiente.get("SMTP_SENHA") or None,
+        "remetente": (ambiente.get("SMTP_REMETENTE") or "").strip() or usuario or None,
+    }
+
+    token = token_licor({}, ambiente) or token_licor(streamlit, {})
+
+    return url, credenciais, token, smtp
