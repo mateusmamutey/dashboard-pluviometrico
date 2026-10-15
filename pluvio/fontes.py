@@ -2,7 +2,7 @@
 De onde o dashboard tira os dados, com o cache do Streamlit.
 
 - Google Sheets: dados_rio, dados_megas e as abas opcionais
-  config, contatos e alertas_estado.
+  config, contatos e alertas_estado (via pluvio/sheets.py).
 - LI-COR Cloud: registros do pluviógrafo, guardados em cache por mês.
   Mês fechado fica 24 h em cache; o mês corrente até ontem, 6 h; o dia
   de hoje, 5 min. Assim a página abre rápido e a API é pouco chamada.
@@ -12,7 +12,6 @@ import os
 
 import pandas as pd
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 
 from pluvio.config import config_da_aba, montar_config, token_licor
 from pluvio.constantes import ABA_CONFIG
@@ -23,14 +22,31 @@ from pluvio.licor_api import (
     agora_utc,
 )
 from pluvio.planilha import tratar_estacao
+from pluvio.sheets import Planilha
 
 
 # ============================================================
 # GOOGLE SHEETS
 # ============================================================
 
-def conexao():
-    return st.connection("gsheets", type=GSheetsConnection)
+@st.cache_resource(show_spinner=False)
+def planilha():
+    """
+    A planilha, aberta com a conta de serviço de [connections.gsheets]
+    no st.secrets (o mesmo formato de antes).
+    """
+
+    credenciais = dict(segredos().get("connections", {}).get("gsheets", {}))
+    url = credenciais.pop("spreadsheet", None)
+    credenciais.pop("worksheet", None)
+
+    if not url or not credenciais.get("private_key"):
+        raise RuntimeError(
+            "Faltam os dados da planilha em st.secrets, na seção "
+            "[connections.gsheets] (endereço e conta de serviço)."
+        )
+
+    return Planilha(url, credenciais)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -38,11 +54,14 @@ def carregar_estacao(nome_aba):
     """Carrega uma aba de leituras manuais e faz o tratamento básico."""
 
     try:
-        df = conexao().read(worksheet=nome_aba, ttl=0)
+        df = planilha().ler(nome_aba, seriais=True)
     except Exception as exc:
         raise RuntimeError(
             f"Erro ao ler a aba '{nome_aba}' do Google Sheets: {exc}"
         )
+
+    if df is None:
+        raise RuntimeError(f"A aba '{nome_aba}' não existe na planilha.")
 
     return tratar_estacao(df, nome_aba)
 
@@ -52,7 +71,7 @@ def ler_aba_opcional(nome_aba):
     """Aba que pode não existir (config, contatos). None se faltar."""
 
     try:
-        return conexao().read(worksheet=nome_aba, ttl=0)
+        return planilha().ler(nome_aba)
     except Exception:
         return None
 

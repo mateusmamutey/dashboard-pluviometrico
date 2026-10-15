@@ -59,30 +59,27 @@ def chuva_do_pluviografo(contexto, estacao, momento_leitura):
 def salvar_leitura(estacao, nova_data, nova_hora, nova_precipitacao, novas_observacoes):
     """
     Grava a leitura na aba da estação. Retorna (ok, mensagem).
-    Lógica da v5: lê a aba bruta, confere duplicidade de data e hora,
-    acrescenta a linha e regrava.
+
+    Confere se já existe leitura com a mesma data e hora e acrescenta
+    só a linha nova no fim da aba. A aba nunca é regravada inteira:
+    isso trocaria as datas em formato americano que existem nela
+    (veja pluvio/sheets.py).
     """
 
     aba_destino = ABAS_PLUVIOMETROS[estacao]
-    conn = fontes.conexao()
+    planilha = fontes.planilha()
 
-    df_bruto = conn.read(worksheet=aba_destino, ttl=0)
+    df_bruto = planilha.ler(aba_destino, seriais=True)
 
     if df_bruto is None:
-        df_bruto = pd.DataFrame()
+        return False, f"❌ A aba '{aba_destino}' não existe na planilha."
 
     df_bruto = padronizar_colunas(df_bruto)
-
-    if "indice" not in df_bruto.columns:
-        df_bruto["indice"] = range(1, len(df_bruto) + 1)
-
-    if "Observações" not in df_bruto.columns:
-        df_bruto["Observações"] = "-"
 
     # Próximo índice
     indices_numericos = pd.to_numeric(df_bruto["indice"], errors="coerce")
 
-    if indices_numericos.empty or indices_numericos.dropna().empty:
+    if indices_numericos.dropna().empty:
         novo_indice = 1
     else:
         novo_indice = int(indices_numericos.dropna().max()) + 1
@@ -90,16 +87,12 @@ def salvar_leitura(estacao, nova_data, nova_hora, nova_precipitacao, novas_obser
     # Registro com a mesma data e hora já existe?
     hora_nova_texto = nova_hora.strftime("%H:%M:%S")
 
-    if not df_bruto.empty:
+    if not df_bruto.empty and {"DATA", "HORA"} <= set(df_bruto.columns):
 
-        verificacao = df_bruto.copy()
-        verificacao["DATA"] = converter_datas(verificacao["DATA"])
-        verificacao["HORA"] = verificacao["HORA"].apply(limpar_hora)
+        datas = converter_datas(df_bruto["DATA"])
+        horas = df_bruto["HORA"].apply(limpar_hora)
 
-        duplicados = verificacao[
-            (verificacao["DATA"].dt.date == nova_data)
-            & (verificacao["HORA"] == hora_nova_texto)
-        ]
+        duplicados = df_bruto[(datas.dt.date == nova_data) & (horas == hora_nova_texto)]
 
         if not duplicados.empty:
             return False, (
@@ -107,33 +100,14 @@ def salvar_leitura(estacao, nova_data, nova_hora, nova_precipitacao, novas_obser
                 f"às {hora_nova_texto} na estação {estacao}."
             )
 
-    novo_registro = pd.DataFrame(
-        [
-            {
-                "indice": novo_indice,
-                "DATA": nova_data.strftime("%Y-%m-%d"),
-                "HORA": hora_nova_texto,
-                "Precipitação (mm)": float(nova_precipitacao),
-                "Observações": novas_observacoes.strip() if novas_observacoes else "-",
-            }
-        ]
+    planilha.acrescentar_leitura(
+        aba_destino,
+        indice=novo_indice,
+        dia=nova_data,
+        hora=nova_hora,
+        mm=nova_precipitacao,
+        observacoes=novas_observacoes.strip() if novas_observacoes else "-",
     )
-
-    # Mantém possíveis colunas extras existentes
-    for coluna in novo_registro.columns:
-        if coluna not in df_bruto.columns:
-            df_bruto[coluna] = None
-
-    for coluna in df_bruto.columns:
-        if coluna not in novo_registro.columns:
-            novo_registro[coluna] = None
-
-    df_atualizado = pd.concat(
-        [df_bruto, novo_registro[df_bruto.columns]],
-        ignore_index=True,
-    )
-
-    conn.update(worksheet=aba_destino, data=df_atualizado)
 
     return True, "✅ Registro adicionado."
 

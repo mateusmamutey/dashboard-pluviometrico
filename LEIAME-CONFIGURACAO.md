@@ -130,7 +130,8 @@ pluvio/
   bacia_solo.py              eventos, resposta do nível, umidade antecedente
   alertas.py                 regras e envio dos alertas
   config.py                  configuração (padrões, secrets, aba config)
-  planilha.py                leitura das abas manuais (funções da v5)
+  planilha.py                tratamento das abas manuais (funções da v5)
+  sheets.py                  Google Sheets: lê datas pelo valor guardado, acrescenta leituras
   fontes.py                  Google Sheets e LI-COR com cache do Streamlit
   abas/                      uma tela por aba
 componentes/                 animações em HTML/SVG/Canvas (sem build)
