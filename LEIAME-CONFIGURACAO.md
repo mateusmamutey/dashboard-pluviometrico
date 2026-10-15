@@ -96,14 +96,21 @@ Os alertas rodam no **GitHub Actions** a cada 15 min
   número seguindo as instruções em callmebot.com (WhatsApp → API) e
   recebe uma apikey, que vai na coluna `callmebot_apikey`.
 
-**Segredos no GitHub** (Settings → Secrets and variables → Actions)
+**Segredos no GitHub** (Settings → Secrets and variables → Actions →
+aba Secrets → New repository secret). São só três:
 
 | segredo | conteúdo |
 |---|---|
-| `LICOR_TOKEN` | o mesmo token do passo 1 |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | o JSON inteiro da conta de serviço do Google (a mesma do Streamlit) |
-| `PLANILHA_URL` | endereço da planilha |
-| `SMTP_HOST`, `SMTP_PORTA`, `SMTP_USUARIO`, `SMTP_SENHA`, `SMTP_REMETENTE` | servidor de e-mail. No Gmail: `smtp.gmail.com`, porta `587`, e uma **senha de app** (exige verificação em duas etapas). |
+| `STREAMLIT_SECRETS` | o texto inteiro dos Secrets do Streamlit Cloud (Settings → Secrets), copiado e colado. Dele saem a planilha, a conta de serviço e o token do LI-COR. |
+| `SMTP_USUARIO` | o e-mail que vai enviar os alertas (Gmail) |
+| `SMTP_SENHA` | uma **senha de app** desse Gmail (myaccount.google.com/apppasswords; exige verificação em duas etapas). Não é a senha normal. |
+
+Opcionais: `PLANILHA_URL`, `GOOGLE_SERVICE_ACCOUNT_JSON` e `LICOR_TOKEN`
+vencem o que vier do `STREAMLIT_SECRETS`; `SMTP_HOST`, `SMTP_PORTA` e
+`SMTP_REMETENTE` servem para outro servidor que não o Gmail.
+
+A conta de serviço (o `client_email` dos Secrets) precisa ser **Editor**
+da planilha: ela grava as leituras e a aba `alertas_estado`.
 
 **Testar**: aba **Actions → Alertas do pluviômetro → Run workflow**.
 `teste` só mostra o que seria enviado; `mensagem-teste` manda uma

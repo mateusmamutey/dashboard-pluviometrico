@@ -40,19 +40,22 @@ jobs:
 
       - name: Avaliar e enviar alertas
         env:
+          # O jeito simples: STREAMLIT_SECRETS (texto inteiro dos Secrets do
+          # Streamlit), SMTP_USUARIO e SMTP_SENHA. Os outros são opcionais.
+          STREAMLIT_SECRETS: ${{ secrets.STREAMLIT_SECRETS }}
+          SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
+          SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
           LICOR_TOKEN: ${{ secrets.LICOR_TOKEN }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           PLANILHA_URL: ${{ secrets.PLANILHA_URL }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORTA: ${{ secrets.SMTP_PORTA }}
-          SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
-          SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
           SMTP_REMETENTE: ${{ secrets.SMTP_REMETENTE }}
           MODO: ${{ github.event.inputs.modo || 'normal' }}
         run: |
           # Enquanto os segredos não forem configurados, não falha a
           # cada 15 min (o GitHub mandaria um e-mail por falha).
-          if [ -z "$PLANILHA_URL" ] || [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+          if [ -z "$STREAMLIT_SECRETS" ] && { [ -z "$PLANILHA_URL" ] || [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; }; then
             echo "::notice::Segredos dos alertas ainda não configurados. Veja LEIAME-CONFIGURACAO.md."
             exit 0
           fi
