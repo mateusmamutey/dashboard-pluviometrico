@@ -285,15 +285,58 @@ def enviar_whatsapp(mensagem, contato):
     resposta.raise_for_status()
 
 
-def enviar(mensagens, contatos, smtp, registrar=print):
-    """Manda cada mensagem por e-mail e WhatsApp. Falha num canal não para os outros."""
+def github_do_ambiente(ambiente):
+    """
+    Token automático do GitHub Actions (não é um segredo que alguém cria).
+    None fora do Actions ou sem o token no workflow.
+    """
+
+    token = (ambiente.get("GITHUB_TOKEN") or "").strip()
+    repositorio = (ambiente.get("GITHUB_REPOSITORY") or "").strip()
+
+    if not token or "/" not in repositorio:
+        return None
+
+    dono = (ambiente.get("GITHUB_REPOSITORY_OWNER") or "").strip() or repositorio.split("/")[0]
+
+    return {"token": token, "repositorio": repositorio, "dono": dono}
+
+
+def enviar_github(mensagem, github):
+    """
+    Abre um aviso (issue) no repositório. O GitHub manda e-mail ao dono,
+    que é mencionado no texto, sem precisar de senha de e-mail.
+    """
+
+    resposta = requests.post(
+        f"https://api.github.com/repos/{github['repositorio']}/issues",
+        headers={
+            "Authorization": f"Bearer {github['token']}",
+            "Accept": "application/vnd.github+json",
+        },
+        json={
+            "title": f"[Pluviômetro] {mensagem.assunto}",
+            "body": f"{mensagem.texto}\n\ncc @{github['dono']}",
+        },
+        timeout=30,
+    )
+    resposta.raise_for_status()
+
+
+def enviar(mensagens, contatos, smtp, registrar=print, github=None):
+    """
+    Manda cada mensagem por e-mail e WhatsApp. Falha num canal não para os
+    outros. Se ninguém recebeu, e github foi dado, vira um aviso no GitHub.
+    """
 
     for mensagem in mensagens:
 
+        entregues = 0
         emails = [c["email"] for c in contatos if c["email"]]
 
         try:
             enviados = enviar_email(mensagem, emails, smtp)
+            entregues += enviados
             registrar(f"e-mail '{mensagem.assunto}': {enviados} destinatário(s)")
         except Exception as exc:
             registrar(f"FALHA no e-mail '{mensagem.assunto}': {exc}")
@@ -305,6 +348,16 @@ def enviar(mensagens, contatos, smtp, registrar=print):
 
             try:
                 enviar_whatsapp(mensagem, contato)
+                entregues += 1
                 registrar(f"WhatsApp '{mensagem.assunto}': {contato['nome'] or contato['whatsapp']}")
             except Exception as exc:
                 registrar(f"FALHA no WhatsApp para {contato['nome'] or contato['whatsapp']}: {exc}")
+
+        if entregues or not github:
+            continue
+
+        try:
+            enviar_github(mensagem, github)
+            registrar(f"aviso no GitHub '{mensagem.assunto}' para @{github['dono']}")
+        except Exception as exc:
+            registrar(f"FALHA no aviso do GitHub '{mensagem.assunto}': {exc}")

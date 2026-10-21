@@ -9,12 +9,18 @@ Alertas do pluviômetro, para rodar agendado no GitHub Actions
 Variáveis de ambiente (segredos do GitHub):
     STREAMLIT_SECRETS             texto inteiro dos Secrets do Streamlit Cloud
                                   (planilha, conta de serviço e token do LI-COR)
-    SMTP_USUARIO, SMTP_SENHA      e-mail que envia e a senha de app (Gmail)
 
-Opcionais (vencem o STREAMLIT_SECRETS):
-    PLANILHA_URL, GOOGLE_SERVICE_ACCOUNT_JSON, LICOR_TOKEN
+Opcionais:
+    SMTP_USUARIO, SMTP_SENHA      e-mail que envia e a senha de app (Gmail),
+                                  para os contatos da aba contatos
+    PLANILHA_URL, GOOGLE_SERVICE_ACCOUNT_JSON, LICOR_TOKEN (vencem o
+                                  STREAMLIT_SECRETS)
     SMTP_HOST, SMTP_PORTA, SMTP_REMETENTE (padrão: Gmail, 587, o próprio usuário)
     PLUVIO_*                      sobrepõe chaves da configuração
+
+Se nenhum contato receber por e-mail ou WhatsApp, o alerta vira um aviso
+(issue) no repositório, e o GitHub manda e-mail ao dono. Isso usa o
+GITHUB_TOKEN que o próprio Actions fornece.
 """
 
 import argparse
@@ -24,7 +30,7 @@ import sys
 import pandas as pd
 
 from pluvio.acumulado import resumo_desde_esvaziamento, ultimo_esvaziamento
-from pluvio.alertas import Mensagem, avaliar, contatos_da_aba, enviar
+from pluvio.alertas import Mensagem, avaliar, contatos_da_aba, enviar, github_do_ambiente
 from pluvio.config import config_da_aba, config_do_ambiente, montar_config, segredos_dos_alertas
 from pluvio.constantes import ABA_CONFIG, ABA_CONTATOS, ABA_ESTADO_ALERTAS, ABAS_PLUVIOMETROS
 from pluvio.licor_api import (
@@ -91,17 +97,22 @@ def main():
     contatos = contatos_da_aba(planilha.ler(ABA_CONTATOS))
     print(f"{len(contatos)} contato(s) na aba {ABA_CONTATOS}.")
 
-    if not contatos:
-        print(f"Ninguém vai receber: crie a aba '{ABA_CONTATOS}' na planilha (veja LEIAME-CONFIGURACAO.md).")
-
     if not smtp["usuario"]:
         print("Sem SMTP_USUARIO e SMTP_SENHA: e-mails não serão enviados (WhatsApp continua).")
+
+    github = github_do_ambiente(ambiente)
+
+    if github:
+        print(f"Se ninguém receber por e-mail ou WhatsApp, vira aviso no GitHub para @{github['dono']}.")
+    elif not contatos:
+        print(f"Ninguém vai receber: crie a aba '{ABA_CONTATOS}' na planilha (veja LEIAME-CONFIGURACAO.md).")
 
     if args.mensagem_teste:
         enviar(
             [Mensagem("Mensagem de teste", "Teste dos alertas do pluviômetro. Se chegou, está funcionando.")],
             contatos,
             smtp,
+            github=github,
         )
         return 0
 
@@ -171,12 +182,22 @@ def main():
         print("\nModo teste: nada enviado, estado não gravado.")
         return 0
 
-    enviar(mensagens, contatos, smtp)
-    planilha.gravar_estado(
-        ABA_ESTADO_ALERTAS,
-        novo_estado,
-        pd.Timestamp.now(tz=FUSO_ESTACAO).strftime("%d/%m/%Y %H:%M"),
-    )
+    # Grava antes de enviar: se a conta de serviço não puder gravar, o
+    # mesmo alerta sairia de novo a cada 15 minutos.
+    try:
+        planilha.gravar_estado(
+            ABA_ESTADO_ALERTAS,
+            novo_estado,
+            pd.Timestamp.now(tz=FUSO_ESTACAO).strftime("%d/%m/%Y %H:%M"),
+        )
+    except Exception as exc:
+        print(
+            f"Não consegui gravar a aba {ABA_ESTADO_ALERTAS}, então nada foi enviado. "
+            f"A conta de serviço precisa ser Editor da planilha. Erro: {exc}"
+        )
+        return 1
+
+    enviar(mensagens, contatos, smtp, github=github)
 
     return 0
 

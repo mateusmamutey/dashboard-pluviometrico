@@ -18,6 +18,12 @@ on:
         type: choice
         options: [normal, teste, mensagem-teste]
 
+# issues: write deixa o alerta abrir um aviso no repositório quando
+# ninguém recebe por e-mail ou WhatsApp (o GitHub manda e-mail ao dono).
+permissions:
+  contents: read
+  issues: write
+
 concurrency:
   group: alertas
   cancel-in-progress: false
@@ -40,9 +46,11 @@ jobs:
 
       - name: Avaliar e enviar alertas
         env:
-          # O jeito simples: STREAMLIT_SECRETS (texto inteiro dos Secrets do
-          # Streamlit), SMTP_USUARIO e SMTP_SENHA. Os outros são opcionais.
+          # Basta o STREAMLIT_SECRETS (texto inteiro dos Secrets do
+          # Streamlit). SMTP_USUARIO e SMTP_SENHA mandam e-mail aos
+          # contatos; sem eles, o alerta vira aviso no GitHub.
           STREAMLIT_SECRETS: ${{ secrets.STREAMLIT_SECRETS }}
+          GITHUB_TOKEN: ${{ github.token }}
           SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
           SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
           LICOR_TOKEN: ${{ secrets.LICOR_TOKEN }}
