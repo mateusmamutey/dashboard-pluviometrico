@@ -59,6 +59,10 @@ class RespostaFalsa:
     def json(self):
         return self._corpo
 
+    def raise_for_status(self):
+        if not self.ok:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 class SessaoFalsa:
     def __init__(self, respostas):
@@ -482,6 +486,75 @@ class TesteSegredosAlertas(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             segredos_dos_alertas({"STREAMLIT_SECRETS": "[connections.gsheets\nx ="})
+
+
+class TesteAvisoGithub(unittest.TestCase):
+
+    GITHUB = {"token": "tk", "repositorio": "dono/repo", "dono": "dono"}
+
+    def setUp(self):
+        import pluvio.alertas as modulo
+
+        self.modulo = modulo
+        self.pedidos = []
+        self.post_original = modulo.requests.post
+        self.email_original = modulo.enviar_email
+
+        def post_falso(url, headers=None, json=None, timeout=None):
+            self.pedidos.append((url, headers, json))
+            return RespostaFalsa(201, {})
+
+        modulo.requests.post = post_falso
+
+    def tearDown(self):
+        self.modulo.requests.post = self.post_original
+        self.modulo.enviar_email = self.email_original
+
+    def test_ambiente(self):
+        from pluvio.alertas import github_do_ambiente
+
+        self.assertIsNone(github_do_ambiente({}))
+        self.assertIsNone(github_do_ambiente({"GITHUB_TOKEN": "tk"}))
+        self.assertEqual(
+            github_do_ambiente({"GITHUB_TOKEN": "tk", "GITHUB_REPOSITORY": "dono/repo"}),
+            self.GITHUB,
+        )
+
+    def test_sem_contatos_vira_aviso(self):
+        from pluvio.alertas import Mensagem, enviar
+
+        enviar([Mensagem("Urgente: pluviômetro Rio", "150 mm")], [], {"host": None}, registrar=lambda _: None, github=self.GITHUB)
+
+        self.assertEqual(len(self.pedidos), 1)
+        url, headers, corpo = self.pedidos[0]
+        self.assertEqual(url, "https://api.github.com/repos/dono/repo/issues")
+        self.assertEqual(headers["Authorization"], "Bearer tk")
+        self.assertEqual(corpo["title"], "[Pluviômetro] Urgente: pluviômetro Rio")
+        self.assertIn("150 mm", corpo["body"])
+        self.assertIn("@dono", corpo["body"])
+
+    def test_quem_recebeu_por_email_nao_gera_aviso(self):
+        from pluvio.alertas import Mensagem, enviar
+
+        self.modulo.enviar_email = lambda mensagem, destinos, smtp: len(destinos)
+        contatos = [{"nome": "A", "email": "a@x.com", "whatsapp": "", "apikey": ""}]
+
+        enviar([Mensagem("Teste", "oi")], contatos, {"host": "smtp"}, registrar=lambda _: None, github=self.GITHUB)
+
+        self.assertEqual(self.pedidos, [])
+
+    def test_email_com_falha_vira_aviso(self):
+        from pluvio.alertas import Mensagem, enviar
+
+        def falha(mensagem, destinos, smtp):
+            raise OSError("sem rede")
+
+        self.modulo.enviar_email = falha
+        contatos = [{"nome": "A", "email": "a@x.com", "whatsapp": "", "apikey": ""}]
+
+        enviar([Mensagem("Teste", "oi")], contatos, {"host": "smtp"}, registrar=lambda _: None, github=self.GITHUB)
+
+        self.assertEqual(len(self.pedidos), 1)
 
 
 if __name__ == "__main__":

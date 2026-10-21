@@ -71,7 +71,7 @@ aviso na barra lateral.
 | `linigrafo_rio`, `linigrafo_mega_1` … `_3` | séries do projeto | Linígrafos (aba Bacia & solo). |
 | `umidade_mega_1_superior` etc. | séries do projeto | Sondas de umidade (aba Bacia & solo). |
 
-## 3. Alertas por e-mail e WhatsApp
+## 3. Alertas (GitHub, e-mail e WhatsApp)
 
 Os alertas rodam no **GitHub Actions** a cada 15 min
 (`.github/workflows/alertas.yml`), sem depender de alguém abrir a página.
@@ -85,7 +85,15 @@ Os alertas rodam no **GitHub Actions** a cada 15 min
 - Plano: 30, 15, 7 e 1 dia antes do vencimento, e no dia.
 - Leitura de 2 min acima de 3,4 mm (pluviógrafo saturado).
 
-**Quem recebe: aba `contatos`**
+**Quem recebe**
+
+Sem nada além do `STREAMLIT_SECRETS`, cada alerta vira um aviso na aba
+**Issues** do repositório, e o GitHub manda e-mail ao dono do
+repositório. O repositório é público, então esses avisos também são.
+
+Para mandar a outras pessoas, use a aba `contatos` e os segredos do
+Gmail abaixo. Quando alguém recebe por e-mail ou WhatsApp, o aviso no
+GitHub não é aberto.
 
 | nome | email | whatsapp | callmebot_apikey | recebe |
 |---|---|---|---|---|
@@ -97,13 +105,13 @@ Os alertas rodam no **GitHub Actions** a cada 15 min
   recebe uma apikey, que vai na coluna `callmebot_apikey`.
 
 **Segredos no GitHub** (Settings → Secrets and variables → Actions →
-aba Secrets → New repository secret). São só três:
+aba Secrets → New repository secret). Só o primeiro é obrigatório:
 
 | segredo | conteúdo |
 |---|---|
 | `STREAMLIT_SECRETS` | o texto inteiro dos Secrets do Streamlit Cloud (Settings → Secrets), copiado e colado. Dele saem a planilha, a conta de serviço e o token do LI-COR. |
-| `SMTP_USUARIO` | o e-mail que vai enviar os alertas (Gmail) |
-| `SMTP_SENHA` | uma **senha de app** desse Gmail (myaccount.google.com/apppasswords; exige verificação em duas etapas). Não é a senha normal. |
+| `SMTP_USUARIO` | opcional: o e-mail que vai enviar os alertas aos contatos (Gmail) |
+| `SMTP_SENHA` | opcional: uma **senha de app** desse Gmail (myaccount.google.com/apppasswords; exige verificação em duas etapas). Não é a senha normal. |
 
 Opcionais: `PLANILHA_URL`, `GOOGLE_SERVICE_ACCOUNT_JSON` e `LICOR_TOKEN`
 vencem o que vier do `STREAMLIT_SECRETS`; `SMTP_HOST`, `SMTP_PORTA` e
@@ -114,7 +122,8 @@ da planilha: ela grava as leituras e a aba `alertas_estado`.
 
 **Testar**: aba **Actions → Alertas do pluviômetro → Run workflow**.
 `teste` só mostra o que seria enviado; `mensagem-teste` manda uma
-mensagem de teste para todos os contatos.
+mensagem de teste para todos os contatos (ou abre um aviso de teste no
+GitHub, se ninguém receber).
 
 O que já foi avisado fica na aba `alertas_estado` (criada sozinha). Não
 precisa mexer nela.
