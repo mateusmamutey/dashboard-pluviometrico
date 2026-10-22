@@ -1,6 +1,6 @@
 import streamlit as st
 
-from pluvio.abas import agora, bacia_solo, historico, lateral, registrar
+from pluvio.abas import agora, bacia_solo, historico, lateral, manual, registrar
 from pluvio.contexto import montar_contexto
 
 
@@ -33,12 +33,13 @@ lateral.mostrar(contexto)
 # NAVEGAÇÃO
 # ============================================================
 
-aba_agora, aba_registrar, aba_historico, aba_bacia = st.tabs(
+aba_agora, aba_registrar, aba_historico, aba_bacia, aba_manual = st.tabs(
     [
         "🌧️ Agora",
         "📝 Registrar leitura",
         "📊 Histórico",
         "🌊 Bacia & solo",
+        "📖 Manual",
     ]
 )
 
@@ -53,3 +54,6 @@ with aba_historico:
 
 with aba_bacia:
     bacia_solo.mostrar(contexto)
+
+with aba_manual:
+    manual.mostrar(contexto)

@@ -12,6 +12,7 @@ ficam nos "segredos" do Streamlit e do GitHub.
 | **Registrar leitura** | O formulário de sempre. Ao gravar, a torneira abre, a proveta enche e aparece a comparação pluviógrafo × proveta. |
 | **Histórico** | Série manual desde 2020 e pluviógrafo desde que começou, cada uma marcada pelo que é. Indicadores corrigidos, chuva por intervalo entre visitas, cada mês juntando todos os anos (média ou soma, método distribuído ou ingênuo) e o fator de correção. |
 | **Bacia & solo** | Hietograma sobre hidrograma do rio, frente de molhamento por profundidade e umidade antecedente × escoamento nas megaparcelas. |
+| **Manual** | Explica cada aba e cada número para quem nunca usou, com prints das telas (`manual/prints/`). Quando uma tela mudar, troque o print pelo novo com o mesmo nome. |
 
 O mapa das estações saiu. As coordenadas continuam em `pluvio/constantes.py`.
 
