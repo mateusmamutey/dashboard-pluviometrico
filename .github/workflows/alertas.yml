@@ -1,4 +1,4 @@
-# Alertas do pluviômetro: roda a cada 15 minutos, sem depender de
+# Alertas do pluviômetro: roda a cada 30 minutos, sem depender de
 # alguém abrir o dashboard. Os segredos ficam em
 # Settings → Secrets and variables → Actions (veja LEIAME-CONFIGURACAO.md).
 #
@@ -8,7 +8,7 @@ name: Alertas do pluviômetro
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       modo:
@@ -54,7 +54,7 @@ jobs:
           MODO: ${{ github.event.inputs.modo || 'normal' }}
         run: |
           # Enquanto os segredos não forem configurados, não falha a
-          # cada 15 min (o GitHub mandaria um e-mail por falha).
+          # cada 30 min (o GitHub mandaria um e-mail por falha).
           if [ -z "$STREAMLIT_SECRETS" ] && { [ -z "$PLANILHA_URL" ] || [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; }; then
             echo "::notice::Segredos dos alertas ainda não configurados. Veja LEIAME-CONFIGURACAO.md."
             exit 0

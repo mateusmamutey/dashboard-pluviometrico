@@ -588,7 +588,7 @@ def manual_alertas(config):
 
         st.markdown(
             f"""
-Um robô no **GitHub Actions** confere a estação **a cada 15 minutos**, mesmo que
+Um robô no **GitHub Actions** confere a estação **a cada 30 minutos**, mesmo que
 ninguém abra o dashboard, e manda um aviso quando:
 
 - um pluviômetro **entra em Atenção** ({br(atencao_mm)} mm) e de novo quando
