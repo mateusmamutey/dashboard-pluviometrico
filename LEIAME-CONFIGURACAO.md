@@ -74,7 +74,7 @@ aviso na barra lateral.
 
 ## 3. Alertas por e-mail e WhatsApp
 
-Os alertas rodam no **GitHub Actions** a cada 15 min
+Os alertas rodam no **GitHub Actions** a cada 30 min (repositório privado: o plano gratuito tem 2.000 minutos de Actions por mês)
 (`.github/workflows/alertas.yml`), sem depender de alguém abrir a página.
 
 **Quando cada alerta sai**
